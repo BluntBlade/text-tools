@@ -45,29 +45,54 @@ sub calculate_next_epoch {
     return (shift) + 86400;
 } # calculate_next_epoch
 
-my %counts = ();
+my %raw_counts = ();
 
 while (my $date = <>) {
     chomp($date);
     $date = format_date($date);
-    $counts{$date} ||= 0;
-    $counts{$date} += 1;
+    $raw_counts{$date} ||= 0;
+    $raw_counts{$date} += 1;
 } # while
 
-my @dates = sort(keys(%counts));
+my @dates = sort(keys(%raw_counts));
 my $first_epoch = calculate_first_epoch(to_epoch($dates[0]));
 my $last_epoch = calculate_last_epoch(to_epoch($dates[-1]));
 
+my @counts = (
+    [ 0 x 31 ], # 1
+    [ 0 x 28 ], # 2
+    [ 0 x 31 ], # 3
+    [ 0 x 30 ], # 4
+    [ 0 x 31 ], # 5
+    [ 0 x 30 ], # 6
+    [ 0 x 31 ], # 7
+    [ 0 x 31 ], # 8
+    [ 0 x 30 ], # 9
+    [ 0 x 31 ], # 10
+    [ 0 x 30 ], # 11
+    [ 0 x 31 ], # 12
+);
+
 for (my $curr_epoch = $first_epoch; $curr_epoch <= $last_epoch; $curr_epoch = calculate_next_epoch($curr_epoch)) {
     my $curr_date = to_date($curr_epoch);
-    my $val = ($counts{$curr_date} || 0);
+    my (undef, undef, undef, $day, $mon, $year) = localtime($curr_epoch);
+    $mon += 1;
+
+    my $val = $raw_counts{$curr_date};
+
+    if (! defined($val)) {
+        $val = 0;
+    }
     if ($val == 0 and is_sunday($curr_epoch)) {
         $val = "S";
     }
-    printf "%s", $val;
-    if ($curr_date =~ m/^\d{4}-(?:0[13578]-31|1[02]-31|0[469]-30|11-30|02-2[89])$/) {
-        printf "\n";
+    if ($mon == 2 and $day == 29) {
+        push @{$counts[$mon - 1]}, $val;
     } else {
-        printf "\t";
+        $counts[$mon - 1][$day - 1] = $val;
     }
+} # for
+
+for my $values (values(@counts)) {
+    printf "%s\n", join("\t", @$values);
 } # for
